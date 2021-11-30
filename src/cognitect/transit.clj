@@ -19,6 +19,7 @@
   (:require [clojure.string :as str])
   (:import [com.cognitect.transit WriteHandler ReadHandler ArrayReadHandler MapReadHandler
             ArrayReader TransitFactory TransitFactory$Format MapReader]
+           [com.cognitect.transit.impl WriteHandlerMap]
            [com.cognitect.transit.SPI ReaderSPI]
            [java.io InputStream OutputStream]
            [java.util.function Function]))
@@ -155,14 +156,14 @@
   ([out type] (writer out type {}))
   ([^OutputStream out type {:keys [handlers default-handler transform]}]
      (if (#{:json :json-verbose :msgpack} type)
-       (let [handler-map (if (instance? HandlerMapContainer handlers)
-                           (handler-map handlers)
-                           (merge default-write-handlers handlers))]
-         (Writer. (TransitFactory/writer (transit-format type) out handler-map default-handler
-                    (when transform
-                      (reify Function
-                        (apply [_ x]
-                          (transform x)))))))
+       (let [maybe-transform (when transform (reify Function (apply [_ x] (transform x))))
+             handler-map (if (instance? HandlerMapContainer handlers)
+                           (let [maybe-recipe (handler-map handlers)]
+                             (if (instance? WriteHandlerMap maybe-recipe)
+                               maybe-recipe
+                               (.apply maybe-recipe maybe-transform)))
+                           (TransitFactory/writeHandlerMap (merge default-write-handlers handlers)))]
+         (Writer. (TransitFactory/writer (transit-format type) out handler-map default-handler maybe-transform)))
        (throw (ex-info "Type must be :json, :json-verbose or :msgpack" {:type type})))))
 
 (defn write
@@ -375,7 +376,7 @@
   handlers to writer."
   [custom-handlers]
   (HandlerMapContainer.
-   (TransitFactory/writeHandlerMap (merge default-write-handlers custom-handlers))))
+   (TransitFactory/writeHandlerMapRecipe (merge default-write-handlers custom-handlers))))
 
 (defn write-meta
   "For :transform. Will write any metadata present on the value."
