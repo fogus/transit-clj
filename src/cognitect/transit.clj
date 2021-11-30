@@ -24,11 +24,12 @@
            [java.util.function Function]))
 
 (defprotocol HandlerMapProvider
-  (handler-map [this]))
+  (handler-map [this] [this xform]))
 
 (deftype HandlerMapContainer [m]
   HandlerMapProvider
-  (handler-map [this] m))
+  (handler-map [this] (m nil))
+  (handler-map [this xform] (m xform)))
 
 ;; writing
 
@@ -83,6 +84,19 @@
 
 (deftype WithMeta [value meta])
 
+(declare default-write-handlers)
+
+(defn write-handler-map
+  "Returns a HandlerMapContainer containing a WriteHandlerMap
+  containing all the default handlers for Clojure and Java and any
+  custom handlers that you supply, letting you store the return value
+  and pass it to multiple invocations of writer.  This can be more
+  efficient than repeatedly handing the same raw map of types -> custom
+  handlers to writer."
+  [custom-handlers]
+  (HandlerMapContainer.
+   #(TransitFactory/writeHandlerMap (merge default-write-handlers custom-handlers) %)))
+
 (def default-write-handlers
   "Returns a map of default WriteHandlers for
    Clojure types. Java types are handled
@@ -129,8 +143,8 @@
      (tag [_ _] "with-meta")
      (rep [_ o]
        (TransitFactory/taggedValue "array"
-         [(.-value ^cognitect.transit.WithMeta o)
-          (.-meta ^cognitect.transit.WithMeta o)]))
+                                   [(.-value ^cognitect.transit.WithMeta o)
+                                    (.-meta ^cognitect.transit.WithMeta o)]))
      (stringRep [_ _] nil)
      (getVerboseHandler [_] nil))})
 
@@ -154,16 +168,13 @@
    they are written."
   ([out type] (writer out type {}))
   ([^OutputStream out type {:keys [handlers default-handler transform]}]
-     (if (#{:json :json-verbose :msgpack} type)
-       (let [handler-map (if (instance? HandlerMapContainer handlers)
-                           (handler-map handlers)
-                           (merge default-write-handlers handlers))]
-         (Writer. (TransitFactory/writer (transit-format type) out handler-map default-handler
-                    (when transform
-                      (reify Function
-                        (apply [_ x]
-                          (transform x)))))))
-       (throw (ex-info "Type must be :json, :json-verbose or :msgpack" {:type type})))))
+   (if (#{:json :json-verbose :msgpack} type)
+     (let [maybe-xform (when transform (reify Function (apply [_ x] (transform x))))
+           handler-map (if (instance? HandlerMapContainer handlers)
+                         (handler-map handlers maybe-xform)
+                         (TransitFactory/writeHandlerMap (merge default-write-handlers handlers) maybe-xform))]
+       (Writer. (TransitFactory/writer (transit-format type) out handler-map default-handler maybe-xform)))
+     (throw (ex-info "Type must be :json, :json-verbose or :msgpack" {:type type})))))
 
 (defn write
   "Writes a value to a transit writer."
@@ -365,17 +376,6 @@
   [custom-handlers]
   (HandlerMapContainer.
    (TransitFactory/readHandlerMap (merge default-read-handlers custom-handlers))))
-
-(defn write-handler-map
-  "Returns a HandlerMapContainer containing a WriteHandlerMap
-  containing all the default handlers for Clojure and Java and any
-  custom handlers that you supply, letting you store the return value
-  and pass it to multiple invocations of writer.  This can be more
-  efficient than repeatedly handing the same raw map of types -> custom
-  handlers to writer."
-  [custom-handlers]
-  (HandlerMapContainer.
-   (TransitFactory/writeHandlerMap (merge default-write-handlers custom-handlers))))
 
 (defn write-meta
   "For :transform. Will write any metadata present on the value."
