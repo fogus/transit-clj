@@ -84,19 +84,6 @@
 
 (deftype WithMeta [value meta])
 
-(declare default-write-handlers)
-
-(defn write-handler-map
-  "Returns a HandlerMapContainer containing a WriteHandlerMap
-  containing all the default handlers for Clojure and Java and any
-  custom handlers that you supply, letting you store the return value
-  and pass it to multiple invocations of writer.  This can be more
-  efficient than repeatedly handing the same raw map of types -> custom
-  handlers to writer."
-  [custom-handlers]
-  (HandlerMapContainer.
-   #(TransitFactory/writeHandlerMap (merge default-write-handlers custom-handlers) %)))
-
 (def default-write-handlers
   "Returns a map of default WriteHandlers for
    Clojure types. Java types are handled
@@ -143,8 +130,8 @@
      (tag [_ _] "with-meta")
      (rep [_ o]
        (TransitFactory/taggedValue "array"
-                                   [(.-value ^cognitect.transit.WithMeta o)
-                                    (.-meta ^cognitect.transit.WithMeta o)]))
+         [(.-value ^cognitect.transit.WithMeta o)
+          (.-meta ^cognitect.transit.WithMeta o)]))
      (stringRep [_ _] nil)
      (getVerboseHandler [_] nil))})
 
@@ -376,6 +363,17 @@
   [custom-handlers]
   (HandlerMapContainer.
    (TransitFactory/readHandlerMap (merge default-read-handlers custom-handlers))))
+
+(defn write-handler-map
+  "Returns a HandlerMapContainer containing a WriteHandlerMap
+  containing all the default handlers for Clojure and Java and any
+  custom handlers that you supply, letting you store the return value
+  and pass it to multiple invocations of writer.  This can be more
+  efficient than repeatedly handing the same raw map of types -> custom
+  handlers to writer."
+  [custom-handlers]
+  (HandlerMapContainer.
+   #(TransitFactory/writeHandlerMap (merge default-write-handlers custom-handlers) %)))
 
 (defn write-meta
   "For :transform. Will write any metadata present on the value."
