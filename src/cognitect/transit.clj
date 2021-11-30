@@ -162,7 +162,7 @@
                              (if (instance? WriteHandlerMap maybe-recipe)
                                maybe-recipe
                                (.apply maybe-recipe maybe-transform)))
-                           (TransitFactory/writeHandlerMap (merge default-write-handlers handlers)))]
+                           (TransitFactory/writeHandlerMap (merge default-write-handlers handlers) maybe-transform))]
          (Writer. (TransitFactory/writer (transit-format type) out handler-map default-handler maybe-transform)))
        (throw (ex-info "Type must be :json, :json-verbose or :msgpack" {:type type})))))
 
