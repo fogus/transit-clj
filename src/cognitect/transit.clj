@@ -24,7 +24,7 @@
            [java.util.function Function]))
 
 (defprotocol HandlerMapProvider
-  (handler-map [this] [this xform]))
+  (handler-map [this]))
 
 (deftype HandlerMapContainer [m]
   HandlerMapProvider
