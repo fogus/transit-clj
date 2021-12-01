@@ -28,8 +28,7 @@
 
 (deftype HandlerMapContainer [m]
   HandlerMapProvider
-  (handler-map [this] (m nil))
-  (handler-map [this xform] (m xform)))
+  (handler-map [this] m))
 
 ;; writing
 
@@ -158,7 +157,8 @@
    (if (#{:json :json-verbose :msgpack} type)
      (let [maybe-xform (when transform (reify Function (apply [_ x] (transform x))))
            handler-map (if (instance? HandlerMapContainer handlers)
-                         (handler-map handlers maybe-xform)
+                         (let [{:keys [::constructor ::handlers]} (handler-map handlers)]
+                           (constructor handlers maybe-xform))
                          (TransitFactory/writeHandlerMap (merge default-write-handlers handlers) maybe-xform))]
        (Writer. (TransitFactory/writer (transit-format type) out handler-map default-handler maybe-xform)))
      (throw (ex-info "Type must be :json, :json-verbose or :msgpack" {:type type})))))
@@ -373,7 +373,8 @@
   handlers to writer."
   [custom-handlers]
   (HandlerMapContainer.
-   #(TransitFactory/writeHandlerMap (merge default-write-handlers custom-handlers) %)))
+   {::constructor #(TransitFactory/writeHandlerMap (merge default-write-handlers %1) %2)
+    ::handlers    custom-handlers}))
 
 (defn write-meta
   "For :transform. Will write any metadata present on the value."
