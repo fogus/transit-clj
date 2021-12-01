@@ -24,6 +24,8 @@
            [java.io InputStream OutputStream]
            [java.util.function Function]))
 
+(set! *warn-on-reflection* true)
+
 (defprotocol HandlerMapProvider
   (handler-map [this]))
 
@@ -157,13 +159,10 @@
   ([^OutputStream out type {:keys [handlers default-handler transform]}]
      (if (#{:json :json-verbose :msgpack} type)
        (let [maybe-transform (when transform (reify Function (apply [_ x] (transform x))))
-             handler-map (if (instance? HandlerMapContainer handlers)
-                           (let [maybe-recipe (handler-map handlers)]
-                             (if (instance? WriteHandlerMap maybe-recipe)
-                               maybe-recipe
-                               (.apply maybe-recipe maybe-transform)))
-                           (TransitFactory/writeHandlerMap (merge default-write-handlers handlers) maybe-transform))]
-         (Writer. (TransitFactory/writer (transit-format type) out handler-map default-handler maybe-transform)))
+             handler-map-ctor (if (instance? HandlerMapContainer handlers)
+                                (handler-map handlers)
+                                (TransitFactory/writeHandlerMapRecipe (merge default-write-handlers handlers)))]
+         (Writer. (TransitFactory/constructWriter (transit-format type) out default-handler handler-map-ctor maybe-transform)))
        (throw (ex-info "Type must be :json, :json-verbose or :msgpack" {:type type})))))
 
 (defn write
