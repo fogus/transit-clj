@@ -56,6 +56,19 @@
     (is (= 'foo x))
     (is (= {:bar "baz"} (meta x)))))
 
+(deftest test-map-key-symbol-with-meta
+  (let [out (ByteArrayOutputStream. 2000)
+        ext (t/write-handler-map {})
+        w   (t/writer out :json {:transform t/write-meta :handlers ext})
+        _   (t/write w {(with-meta 'foo {:bar "baz"}) 42})
+        in  (ByteArrayInputStream. (.toByteArray out))
+        r   (t/reader in :json)
+        m   (t/read r)
+        x   (ffirst m)]
+    (is '{foo 42} m)
+    (is (= 'foo x))
+    (is (= {:bar "baz"} (meta x)))))
+
 (deftest test-nested-with-meta
   (let [out (ByteArrayOutputStream. 2000)
         w   (t/writer out :json {:transform t/write-meta})
