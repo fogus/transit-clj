@@ -65,7 +65,7 @@
         r   (t/reader in :json)
         m   (t/read r)
         x   (ffirst m)]
-    (is '{foo 42} m)
+    (is (= '{foo 42} m))
     (is (= 'foo x))
     (is (= {:bar "baz"} (meta x)))))
 
